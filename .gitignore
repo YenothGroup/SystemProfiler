@@ -1,0 +1,15 @@
+# Compiled binaries and directories
+dist/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+*.zip
+
+# Generated system report PDFs
+*.pdf
+
+# Go build cache & tooling
+vendor/

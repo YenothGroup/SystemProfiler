@@ -1,0 +1,135 @@
+name: Build & Package Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # 1. WINDOWS BUILD (.exe)
+  # =========================================================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Compile Windows Executable
+        shell: pwsh
+        run: |
+          $env:CGO_ENABLED = "1"
+          go build -ldflags="-H=windowsgui -s -w" -o SysProfiler-Windows-x64.exe ./cmd/sysprofiler
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SysProfiler-Windows-x64
+          path: SysProfiler-Windows-x64.exe
+
+  # =========================================================================
+  # 2. LINUX BUILD (Portable ELF Binary)
+  # =========================================================================
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install Linux GUI/OpenGL Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
+
+      - name: Compile Linux Binary
+        run: |
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o SysProfiler-Linux-x64 ./cmd/sysprofiler
+          chmod +x SysProfiler-Linux-x64
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SysProfiler-Linux-x64
+          path: SysProfiler-Linux-x64
+
+  # =========================================================================
+  # 3. MACOS BUILD (Universal 2: Intel + Apple Silicon .app)
+  # =========================================================================
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Build macOS Universal 2 .app Bundle
+        run: |
+          mkdir -p SysProfiler.app/Contents/MacOS
+          mkdir -p SysProfiler.app/Contents/Resources
+
+          # Build Intel (x86_64)
+          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin_amd64 ./cmd/sysprofiler
+
+          # Build Apple Silicon (arm64)
+          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin_arm64 ./cmd/sysprofiler
+
+          # Combine slices into fat Universal 2 binary
+          lipo -create -output SysProfiler.app/Contents/MacOS/SysProfiler bin_amd64 bin_arm64
+          rm bin_amd64 bin_arm64
+
+          # Copy Info.plist metadata
+          cp assets/info.plist.template SysProfiler.app/Contents/Info.plist
+
+          # Ad-hoc code sign bundle
+          codesign --force --deep -s - SysProfiler.app
+
+          # Package as portable zip for download
+          zip -r SysProfiler-macOS-Universal.zip SysProfiler.app
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SysProfiler-macOS-Universal
+          path: SysProfiler-macOS-Universal.zip
+
+  # =========================================================================
+  # 4. GITHUB RELEASE CREATOR (Triggers on Git Tags)
+  # =========================================================================
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Draft GitHub Release with Binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SysProfiler-Windows-x64/SysProfiler-Windows-x64.exe
+            SysProfiler-Linux-x64/SysProfiler-Linux-x64
+            SysProfiler-macOS-Universal/SysProfiler-macOS-Universal.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

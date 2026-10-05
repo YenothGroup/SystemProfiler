@@ -85,21 +85,29 @@ jobs:
 
       - name: Build macOS Universal 2 .app Bundle
         run: |
+
+          # Clean previous builds to avoid stale bundles
+          rm -rf SysProfiler.app
+          
           mkdir -p SysProfiler.app/Contents/MacOS
           mkdir -p SysProfiler.app/Contents/Resources
 
           # Build Intel (x86_64)
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin_amd64 ./cmd/sysprofiler
+          CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin_amd64 ./cmd/sysprofiler
 
           # Build Apple Silicon (arm64)
-          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin_arm64 ./cmd/sysprofiler
+          CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin_arm64 ./cmd/sysprofiler
 
           # Combine slices into fat Universal 2 binary
           lipo -create -output SysProfiler.app/Contents/MacOS/SysProfiler bin_amd64 bin_arm64
           rm bin_amd64 bin_arm64
 
-          # Copy Info.plist metadata
+          # Copy Info.plist metadata with LSMinimumSystemVersion set to 10.13
           cp assets/info.plist.template SysProfiler.app/Contents/Info.plist
+
+          # Verify the minimum system version is correctly set
+          echo "Verifying Info.plist LSMinimumSystemVersion:"
+          plutil -p SysProfiler.app/Contents/Info.plist | grep -i minimum || echo "Warning: Could not verify LSMinimumSystemVersion"
 
           # Ad-hoc code sign bundle
           codesign --force --deep -s - SysProfiler.app

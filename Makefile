@@ -22,10 +22,10 @@ macos:
 	mkdir -p $(OUTPUT_DIR)/macos/$(APP_NAME).app/Contents/MacOS
 	mkdir -p $(OUTPUT_DIR)/macos/$(APP_NAME).app/Contents/Resources
 	# Build Intel x86_64
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 \
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 \
 		go build -ldflags="-s -w" -o $(OUTPUT_DIR)/macos/bin_amd64 ./cmd/sysprofiler
 	# Build Apple Silicon arm64
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 \
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 \
 		go build -ldflags="-s -w" -o $(OUTPUT_DIR)/macos/bin_arm64 ./cmd/sysprofiler
 	# Combine into Universal 2 binary
 	lipo -create -output $(OUTPUT_DIR)/macos/$(APP_NAME).app/Contents/MacOS/$(APP_NAME) \

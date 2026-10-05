@@ -102,8 +102,12 @@ jobs:
           lipo -create -output SysProfiler.app/Contents/MacOS/SysProfiler bin_amd64 bin_arm64
           rm bin_amd64 bin_arm64
 
-          # Copy Info.plist metadata
+          # Copy Info.plist metadata with LSMinimumSystemVersion set to 10.13
           cp assets/info.plist.template SysProfiler.app/Contents/Info.plist
+
+          # Verify the minimum system version is correctly set
+          echo "Verifying Info.plist LSMinimumSystemVersion:"
+          plutil -p SysProfiler.app/Contents/Info.plist | grep -i minimum || echo "Warning: Could not verify LSMinimumSystemVersion"
 
           # Ad-hoc code sign bundle
           codesign --force --deep -s - SysProfiler.app

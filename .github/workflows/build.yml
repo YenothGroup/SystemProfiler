@@ -89,10 +89,10 @@ jobs:
           mkdir -p SysProfiler.app/Contents/Resources
 
           # Build Intel (x86_64)
-          CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin_amd64 ./cmd/sysprofiler
+          CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin_amd64 ./cmd/sysprofiler
 
           # Build Apple Silicon (arm64)
-          CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin_arm64 ./cmd/sysprofiler
+          CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=10.13 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin_arm64 ./cmd/sysprofiler
 
           # Combine slices into fat Universal 2 binary
           lipo -create -output SysProfiler.app/Contents/MacOS/SysProfiler bin_amd64 bin_arm64

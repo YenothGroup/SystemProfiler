@@ -85,6 +85,10 @@ jobs:
 
       - name: Build macOS Universal 2 .app Bundle
         run: |
+
+          # Clean previous builds to avoid stale bundles
+          rm -rf SysProfiler.app
+          
           mkdir -p SysProfiler.app/Contents/MacOS
           mkdir -p SysProfiler.app/Contents/Resources
 

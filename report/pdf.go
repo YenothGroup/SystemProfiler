@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/johnfercher/maroto/v2"
@@ -19,13 +20,12 @@ import (
 )
 
 var (
-	// Brand Color Palette (Corporate Slate & Deep Blue)
-	bannerColor  = &props.Color{Red: 30, Green: 41, Blue: 59}    // Slate 800
-	accentColor  = &props.Color{Red: 15, Green: 118, Blue: 110}  // Teal 700
-	sectionColor = &props.Color{Red: 241, Green: 245, Blue: 249} // Slate 100
-	zebraColor   = &props.Color{Red: 248, Green: 250, Blue: 252} // Slate 50
-	labelColor   = &props.Color{Red: 71, Green: 85, Blue: 105}   // Slate 600
-	valueColor   = &props.Color{Red: 15, Green: 23, Blue: 42}    // Slate 900
+	bannerColor  = &props.Color{Red: 30, Green: 41, Blue: 59}
+	accentColor  = &props.Color{Red: 15, Green: 118, Blue: 110}
+	sectionColor = &props.Color{Red: 241, Green: 245, Blue: 249}
+	zebraColor   = &props.Color{Red: 248, Green: 250, Blue: 252}
+	labelColor   = &props.Color{Red: 71, Green: 85, Blue: 105}
+	valueColor   = &props.Color{Red: 15, Green: 23, Blue: 42}
 	whiteColor   = &props.Color{Red: 255, Green: 255, Blue: 255}
 )
 
@@ -63,10 +63,9 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 				Color: &props.Color{Red: 148, Green: 163, Blue: 184},
 			})),
 		).WithStyle(&props.Cell{BackgroundColor: bannerColor}),
-		row.New(6), // Spacer
+		row.New(6),
 	)
 
-	// Helper function for formatted section headers
 	addSectionHeader := func(title string) {
 		m.AddRows(
 			row.New(7).Add(
@@ -82,7 +81,6 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 		)
 	}
 
-	// Helper function for key-value row pairs
 	addSpecRow := func(label, val string, isZebra bool) {
 		r := row.New(5).Add(
 			col.New(4).Add(text.New(label, props.Text{Style: fontstyle.Bold, Size: 8, Color: labelColor})),
@@ -95,12 +93,17 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 
 	// --- 2. System Identification ---
+	moboText := strings.TrimSpace(specs.Motherboard.Manufacturer + " " + specs.Motherboard.Model)
+	if moboText == "" {
+		moboText = "Unknown"
+	}
 	addSectionHeader("1. SYSTEM IDENTIFICATION")
 	addSpecRow("Manufacturer / Vendor", specs.General.Manufacturer, false)
 	addSpecRow("Product Model", specs.General.Model, true)
-	addSpecRow("Serial Number (Service Tag)", specs.General.SerialNumber, false)
-	addSpecRow("Operating System", specs.General.OS, true)
-	addSpecRow("System Architecture", specs.CPU.Architecture, false)
+	addSpecRow("Motherboard / Baseboard", moboText, false)
+	addSpecRow("Serial Number (Service Tag)", specs.General.SerialNumber, true)
+	addSpecRow("Operating System", specs.General.OS, false)
+	addSpecRow("System Architecture", specs.CPU.Architecture, true)
 	m.AddRows(row.New(4))
 
 	// --- 3. Processor & Memory ---
@@ -108,11 +111,32 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	addSectionHeader("2. PROCESSOR & MEMORY")
 	addSpecRow("Processor Model", specs.CPU.ModelName, false)
 	addSpecRow("Core Configuration", fmt.Sprintf("%d Physical Cores / %d Threads", specs.CPU.PhysicalCores, specs.CPU.LogicalCores), true)
-	addSpecRow("Physical Installed RAM", fmt.Sprintf("%.0f GB (%.2f GB)", ramGB, ramGB), false)
+	addSpecRow("Clock Speeds", specs.FormatClockSummary(), false)
+	addSpecRow("Physical Installed RAM", fmt.Sprintf("%.0f GB (%.2f GB)", ramGB, ramGB), true)
 	m.AddRows(row.New(4))
 
-	// --- 4. Battery Diagnostics ---
-	addSectionHeader("3. POWER & BATTERY DIAGNOSTICS")
+	// --- 4. Graphics Controllers (GPU) ---
+	addSectionHeader("3. GRAPHICS CONTROLLERS (GPU)")
+	if len(specs.GPUs) == 0 {
+		addSpecRow("Graphics Hardware", "No dedicated or integrated GPU detected", false)
+	} else {
+		for i, gpu := range specs.GPUs {
+			isZebra := (i % 2) != 0
+			r := row.New(5).Add(
+				col.New(6).Add(text.New(gpu.Name, props.Text{Style: fontstyle.Bold, Size: 8, Color: valueColor})),
+				col.New(3).Add(text.New("VRAM: "+gpu.VRAM, props.Text{Size: 8, Color: accentColor})),
+				col.New(3).Add(text.New("Driver: "+gpu.DriverVersion, props.Text{Size: 8, Align: align.Right, Color: labelColor})),
+			)
+			if isZebra {
+				r.WithStyle(&props.Cell{BackgroundColor: zebraColor})
+			}
+			m.AddRows(r)
+		}
+	}
+	m.AddRows(row.New(4))
+
+	// --- 5. Battery Diagnostics ---
+	addSectionHeader("4. POWER & BATTERY DIAGNOSTICS")
 	if specs.Battery.Present {
 		addSpecRow("Power State", specs.Battery.State, false)
 		addSpecRow("Current Charge Level", fmt.Sprintf("%.1f%%", specs.Battery.CurrentPercent), true)
@@ -125,8 +149,8 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 	m.AddRows(row.New(4))
 
-	// --- 5. Network Hardware ---
-	addSectionHeader("4. PHYSICAL NETWORK CONTROLLERS")
+	// --- 6. Network Hardware ---
+	addSectionHeader("5. PHYSICAL NETWORK CONTROLLERS")
 	if len(specs.NetworkAdapters) == 0 {
 		addSpecRow("Network Hardware", "No physical network adapters detected", false)
 	} else {
@@ -149,8 +173,8 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 	m.AddRows(row.New(4))
 
-	// --- 6. Storage Hardware ---
-	addSectionHeader("5. INSTALLED PHYSICAL STORAGE DRIVES")
+	// --- 7. Storage Hardware ---
+	addSectionHeader("6. INSTALLED PHYSICAL STORAGE DRIVES")
 	if len(specs.StorageDevices) == 0 {
 		addSpecRow("Storage Hardware", "No physical storage drives detected", false)
 	} else {
@@ -170,7 +194,7 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 
 	// --- Footer ---
 	m.AddRows(
-		row.New(10), // Bottom spacer
+		row.New(10),
 		row.New(5).Add(
 			col.New(12).Add(
 				text.New("Confidential • Extracted locally with zero network sockets or external telemetry.", props.Text{

@@ -1,5 +1,10 @@
 package collector
 
+import (
+	"fmt"
+	"strings"
+)
+
 // SystemSpecs is the unified offline model populated across all OS targets.
 type SystemSpecs struct {
 	General struct {
@@ -10,11 +15,20 @@ type SystemSpecs struct {
 		OS           string `json:"os"`
 	} `json:"general"`
 
+	Motherboard struct {
+		Manufacturer string `json:"manufacturer"`
+		Model        string `json:"model"`
+		SerialNumber string `json:"serial_number"`
+	} `json:"motherboard"`
+
 	CPU struct {
-		ModelName     string `json:"model_name"`
-		PhysicalCores int    `json:"physical_cores"`
-		LogicalCores  int    `json:"logical_cores"`
-		Architecture  string `json:"architecture"`
+		ModelName       string  `json:"model_name"`
+		PhysicalCores   int     `json:"physical_cores"`
+		LogicalCores    int     `json:"logical_cores"`
+		BaseClockGHz    float64 `json:"base_clock_ghz"`
+		MaxClockGHz     float64 `json:"max_clock_ghz"`
+		CurrentClockGHz float64 `json:"current_clock_ghz"`
+		Architecture    string  `json:"architecture"`
 	} `json:"cpu"`
 
 	Memory struct {
@@ -22,6 +36,8 @@ type SystemSpecs struct {
 		AvailableBytes uint64  `json:"available_bytes"`
 		UsedPercentage float64 `json:"used_percentage"`
 	} `json:"memory"`
+
+	GPUs []GPUDevice `json:"gpus"`
 
 	Battery struct {
 		Present        bool    `json:"present"`
@@ -35,6 +51,30 @@ type SystemSpecs struct {
 
 	NetworkAdapters []NetworkAdapter `json:"network_adapters"`
 	StorageDevices  []StorageDevice  `json:"storage_devices"`
+}
+
+// FormatClockSummary builds a clean human-readable string of available clock speeds.
+func (s *SystemSpecs) FormatClockSummary() string {
+	var parts []string
+	if s.CPU.BaseClockGHz > 0 {
+		parts = append(parts, fmt.Sprintf("Base: %.2f GHz", s.CPU.BaseClockGHz))
+	}
+	if s.CPU.MaxClockGHz > 0 {
+		parts = append(parts, fmt.Sprintf("Max: %.2f GHz", s.CPU.MaxClockGHz))
+	}
+	if s.CPU.CurrentClockGHz > 0 {
+		parts = append(parts, fmt.Sprintf("Live: %.2f GHz", s.CPU.CurrentClockGHz))
+	}
+	if len(parts) == 0 {
+		return "Unavailable"
+	}
+	return strings.Join(parts, "  •  ")
+}
+
+type GPUDevice struct {
+	Name          string `json:"name"`
+	VRAM          string `json:"vram"`
+	DriverVersion string `json:"driver_version"`
 }
 
 type NetworkAdapter struct {

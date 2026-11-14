@@ -64,7 +64,10 @@ func RunApp(col collector.Collector) {
 		fieldRow("Core Topology", fmt.Sprintf("%d Physical Cores / %d Logical Threads", specs.CPU.PhysicalCores, specs.CPU.LogicalCores)),
 		fieldRow("Physical Memory", fmt.Sprintf("%.0f GB Installed RAM (%.2f GB)", ramGB, ramGB)))
 	content.Add(widget.NewCard("Processor & Memory", "CPU Architecture and Physical RAM", cpuDetails))
-
+	
+	// --- Section 3: Graphics ---
+	content.Add(widget.NewCard("Graphics", "Detected integrated and discrete graphics adapters", widget.NewLabel(graphicsDisplay(graphicsModels()))))
+	
 	// --- Section 3: Battery Diagnostics ---
 	if specs.Battery.Present {
 		batDetails := container.NewVBox(

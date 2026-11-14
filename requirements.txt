@@ -1,0 +1,5 @@
+customtkinter>=5.2.2
+psutil>=6.0.0
+py-cpuinfo>=9.0.0
+wmi>=1.5.1; sys_platform == 'win32'
+pywin32>=306; sys_platform == 'win32'

@@ -34,58 +34,24 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	filename := GenerateFilename(specs.General.Model, specs.General.SerialNumber, now)
 	targetPath := filepath.Join(outputDir, filename)
 
-	cfg := config.NewBuilder().
-		WithMargins(12, 12, 12).
-		Build()
-
+	cfg := config.NewBuilder().WithMargins(12, 12, 12).Build()
 	m := maroto.New(cfg)
 
-	// --- 1. Executive Top Banner ---
 	m.AddRows(
-		row.New(16).Add(
-			col.New(12).Add(
-				text.New("HARDWARE AUDIT & SYSTEM SPECIFICATION REPORT", props.Text{
-					Style: fontstyle.Bold,
-					Size:  14,
-					Align: align.Left,
-					Color: whiteColor,
-				}),
-			),
-		).WithStyle(&props.Cell{BackgroundColor: bannerColor}),
+		row.New(16).Add(col.New(12).Add(text.New("HARDWARE AUDIT & SYSTEM SPECIFICATION REPORT", props.Text{Style: fontstyle.Bold, Size: 14, Align: align.Left, Color: whiteColor}))).WithStyle(&props.Cell{BackgroundColor: bannerColor}),
 		row.New(6).Add(
-			col.New(6).Add(text.New("Certified Offline Hardware Diagnostic Extraction", props.Text{
-				Size:  8,
-				Color: &props.Color{Red: 148, Green: 163, Blue: 184},
-			})),
-			col.New(6).Add(text.New(fmt.Sprintf("Timestamp: %s", now.Format("2006-01-02 15:04:05 MST")), props.Text{
-				Size:  8,
-				Align: align.Right,
-				Color: &props.Color{Red: 148, Green: 163, Blue: 184},
-			})),
+			col.New(6).Add(text.New("Certified Offline Hardware Diagnostic Extraction", props.Text{Size: 8, Color: &props.Color{Red: 148, Green: 163, Blue: 184}})),
+			col.New(6).Add(text.New(fmt.Sprintf("Timestamp: %s", now.Format("2006-01-02 15:04:05 MST")), props.Text{Size: 8, Align: align.Right, Color: &props.Color{Red: 148, Green: 163, Blue: 184}})),
 		).WithStyle(&props.Cell{BackgroundColor: bannerColor}),
 		row.New(6),
 	)
 
 	addSectionHeader := func(title string) {
-		m.AddRows(
-			row.New(7).Add(
-				col.New(12).Add(
-					text.New(title, props.Text{
-						Style: fontstyle.Bold,
-						Size:  10,
-						Color: bannerColor,
-					}),
-				),
-			).WithStyle(&props.Cell{BackgroundColor: sectionColor}),
-			row.New(2),
-		)
+		m.AddRows(row.New(7).Add(col.New(12).Add(text.New(title, props.Text{Style: fontstyle.Bold, Size: 10, Color: bannerColor}))).WithStyle(&props.Cell{BackgroundColor: sectionColor}), row.New(2))
 	}
 
 	addSpecRow := func(label, val string, isZebra bool) {
-		r := row.New(5).Add(
-			col.New(4).Add(text.New(label, props.Text{Style: fontstyle.Bold, Size: 8, Color: labelColor})),
-			col.New(8).Add(text.New(val, props.Text{Size: 8, Color: valueColor})),
-		)
+		r := row.New(5).Add(col.New(4).Add(text.New(label, props.Text{Style: fontstyle.Bold, Size: 8, Color: labelColor})), col.New(8).Add(text.New(val, props.Text{Size: 8, Color: valueColor})))
 		if isZebra {
 			r.WithStyle(&props.Cell{BackgroundColor: zebraColor})
 		}
@@ -106,7 +72,6 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	addSpecRow("System Architecture", specs.CPU.Architecture, true)
 	m.AddRows(row.New(4))
 
-	// --- 3. Processor & Memory ---
 	ramGB := float64(specs.Memory.TotalBytes) / (1024 * 1024 * 1024)
 	addSectionHeader("2. PROCESSOR & MEMORY")
 	addSpecRow("Processor Model", specs.CPU.ModelName, false)
@@ -135,7 +100,10 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 	m.AddRows(row.New(4))
 
-	// --- 5. Battery Diagnostics ---
+	addSectionHeader("3. GRAPHICS")
+	addSpecRow("GPU Model", strings.Join(specs.Graphics.Models, "\n"), false)
+	m.AddRows(row.New(4))
+
 	addSectionHeader("4. POWER & BATTERY DIAGNOSTICS")
 	if specs.Battery.Present {
 		addSpecRow("Power State", specs.Battery.State, false)
@@ -159,13 +127,8 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 			if nic.IsWireless {
 				nicType = "WLAN (Wi-Fi)"
 			}
-			isZebra := (i % 2) != 0
-			r := row.New(5).Add(
-				col.New(3).Add(text.New(fmt.Sprintf("[%s]", nicType), props.Text{Style: fontstyle.Bold, Size: 8, Color: accentColor})),
-				col.New(5).Add(text.New(nic.DisplayName, props.Text{Size: 8, Color: valueColor})),
-				col.New(4).Add(text.New(nic.MACAddress, props.Text{Size: 8, Align: align.Right, Color: labelColor})),
-			)
-			if isZebra {
+			r := row.New(5).Add(col.New(3).Add(text.New(fmt.Sprintf("[%s]", nicType), props.Text{Style: fontstyle.Bold, Size: 8, Color: accentColor})), col.New(5).Add(text.New(nic.DisplayName, props.Text{Size: 8, Color: valueColor})), col.New(4).Add(text.New(nic.MACAddress, props.Text{Size: 8, Align: align.Right, Color: labelColor})))
+			if i%2 != 0 {
 				r.WithStyle(&props.Cell{BackgroundColor: zebraColor})
 			}
 			m.AddRows(r)
@@ -180,19 +143,14 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	} else {
 		for i, diskItem := range specs.StorageDevices {
 			sizeGB := float64(diskItem.TotalBytes) / 1e9
-			isZebra := (i % 2) != 0
-			r := row.New(5).Add(
-				col.New(8).Add(text.New(diskItem.Model, props.Text{Style: fontstyle.Bold, Size: 8, Color: valueColor})),
-				col.New(4).Add(text.New(fmt.Sprintf("%.1f GB", sizeGB), props.Text{Size: 8, Align: align.Right, Color: accentColor})),
-			)
-			if isZebra {
+			r := row.New(5).Add(col.New(8).Add(text.New(diskItem.Model, props.Text{Style: fontstyle.Bold, Size: 8, Color: valueColor})), col.New(4).Add(text.New(fmt.Sprintf("%.1f GB", sizeGB), props.Text{Size: 8, Align: align.Right, Color: accentColor})))
+			if i%2 != 0 {
 				r.WithStyle(&props.Cell{BackgroundColor: zebraColor})
 			}
 			m.AddRows(r)
 		}
 	}
 
-	// --- Footer ---
 	m.AddRows(
 		row.New(10),
 		row.New(5).Add(
@@ -210,10 +168,8 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed generating PDF: %w", err)
 	}
-
 	if err := os.WriteFile(targetPath, doc.GetBytes(), 0644); err != nil {
 		return "", fmt.Errorf("failed saving PDF to %s: %w", targetPath, err)
 	}
-
 	return targetPath, nil
 }

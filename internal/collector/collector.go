@@ -33,6 +33,10 @@ type SystemSpecs struct {
 		CycleCount     int     `json:"cycle_count"`
 	} `json:"battery"`
 
+	Graphics struct {
+		Models []string `json:"graphics_models"`
+	} `json:"graphics"`
+
 	NetworkAdapters []NetworkAdapter `json:"network_adapters"`
 	StorageDevices  []StorageDevice  `json:"storage_devices"`
 }

@@ -49,6 +49,7 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	addSectionHeader := func(title string) {
 		m.AddRows(row.New(7).Add(col.New(12).Add(text.New(title, props.Text{Style: fontstyle.Bold, Size: 10, Color: bannerColor}))).WithStyle(&props.Cell{BackgroundColor: sectionColor}), row.New(2))
 	}
+
 	addSpecRow := func(label, val string, isZebra bool) {
 		r := row.New(5).Add(col.New(4).Add(text.New(label, props.Text{Style: fontstyle.Bold, Size: 8, Color: labelColor})), col.New(8).Add(text.New(val, props.Text{Size: 8, Color: valueColor})))
 		if isZebra {
@@ -57,19 +58,46 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 		m.AddRows(r)
 	}
 
+	// --- 2. System Identification ---
+	moboText := strings.TrimSpace(specs.Motherboard.Manufacturer + " " + specs.Motherboard.Model)
+	if moboText == "" {
+		moboText = "Unknown"
+	}
 	addSectionHeader("1. SYSTEM IDENTIFICATION")
 	addSpecRow("Manufacturer / Vendor", specs.General.Manufacturer, false)
 	addSpecRow("Product Model", specs.General.Model, true)
-	addSpecRow("Serial Number (Service Tag)", specs.General.SerialNumber, false)
-	addSpecRow("Operating System", specs.General.OS, true)
-	addSpecRow("System Architecture", specs.CPU.Architecture, false)
+	addSpecRow("Motherboard / Baseboard", moboText, false)
+	addSpecRow("Serial Number (Service Tag)", specs.General.SerialNumber, true)
+	addSpecRow("Operating System", specs.General.OS, false)
+	addSpecRow("System Architecture", specs.CPU.Architecture, true)
 	m.AddRows(row.New(4))
 
 	ramGB := float64(specs.Memory.TotalBytes) / (1024 * 1024 * 1024)
 	addSectionHeader("2. PROCESSOR & MEMORY")
 	addSpecRow("Processor Model", specs.CPU.ModelName, false)
 	addSpecRow("Core Configuration", fmt.Sprintf("%d Physical Cores / %d Threads", specs.CPU.PhysicalCores, specs.CPU.LogicalCores), true)
-	addSpecRow("Physical Installed RAM", fmt.Sprintf("%.0f GB (%.2f GB)", ramGB, ramGB), false)
+	addSpecRow("Clock Speeds", specs.FormatClockSummary(), false)
+	addSpecRow("Physical Installed RAM", fmt.Sprintf("%.0f GB (%.2f GB)", ramGB, ramGB), true)
+	m.AddRows(row.New(4))
+
+	// --- 4. Graphics Controllers (GPU) ---
+	addSectionHeader("3. GRAPHICS CONTROLLERS (GPU)")
+	if len(specs.GPUs) == 0 {
+		addSpecRow("Graphics Hardware", "No dedicated or integrated GPU detected", false)
+	} else {
+		for i, gpu := range specs.GPUs {
+			isZebra := (i % 2) != 0
+			r := row.New(5).Add(
+				col.New(6).Add(text.New(gpu.Name, props.Text{Style: fontstyle.Bold, Size: 8, Color: valueColor})),
+				col.New(3).Add(text.New("VRAM: "+gpu.VRAM, props.Text{Size: 8, Color: accentColor})),
+				col.New(3).Add(text.New("Driver: "+gpu.DriverVersion, props.Text{Size: 8, Align: align.Right, Color: labelColor})),
+			)
+			if isZebra {
+				r.WithStyle(&props.Cell{BackgroundColor: zebraColor})
+			}
+			m.AddRows(r)
+		}
+	}
 	m.AddRows(row.New(4))
 
 	addSectionHeader("3. GRAPHICS")
@@ -89,6 +117,7 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 	m.AddRows(row.New(4))
 
+	// --- 6. Network Hardware ---
 	addSectionHeader("5. PHYSICAL NETWORK CONTROLLERS")
 	if len(specs.NetworkAdapters) == 0 {
 		addSpecRow("Network Hardware", "No physical network adapters detected", false)
@@ -107,6 +136,7 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 	}
 	m.AddRows(row.New(4))
 
+	// --- 7. Storage Hardware ---
 	addSectionHeader("6. INSTALLED PHYSICAL STORAGE DRIVES")
 	if len(specs.StorageDevices) == 0 {
 		addSpecRow("Storage Hardware", "No physical storage drives detected", false)
@@ -123,7 +153,15 @@ func GeneratePDF(specs *collector.SystemSpecs, outputDir string) (string, error)
 
 	m.AddRows(
 		row.New(10),
-		row.New(5).Add(col.New(12).Add(text.New("Confidential • Extracted locally with zero network sockets or external telemetry.", props.Text{Size: 7, Align: align.Center, Color: labelColor}))),
+		row.New(5).Add(
+			col.New(12).Add(
+				text.New("Confidential • Extracted locally with zero network sockets or external telemetry.", props.Text{
+					Size:  7,
+					Align: align.Center,
+					Color: labelColor,
+				}),
+			),
+		),
 	)
 
 	doc, err := m.Generate()
